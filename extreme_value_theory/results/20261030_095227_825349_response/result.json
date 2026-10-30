@@ -1,0 +1,67 @@
+{
+  "status": "data_validation_failed",
+  "created_at": "2026-10-30T09:52:27.825929+08:00",
+  "config": {
+    "threshold_quantile": 0.95,
+    "confidence_levels": [
+      0.99
+    ],
+    "bootstrap_repetitions": 200,
+    "block_size": 20,
+    "seed": 20261030
+  },
+  "versions": {
+    "python": "3.14.7",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5",
+    "scipy": "1.18.1"
+  },
+  "limitations": [
+    "日度VaR/ES不是月度累计收益或最大回撤，也不是最大可能亏损。",
+    "全样本拟合使用所有已知历史，不能冒充各历史时点的预测；样本外检验仅使用训练期拟合参数。",
+    "不填补日期缺口，不调整分红或拆分；累计净值不一定是分红再投资总回报，应核对数据口径。",
+    "GPD是高阈值渐近近似；阈值、极值数量、结构变化及时间依赖会影响可靠性；拟合成功不是模型通过验证。",
+    "Bootstrap采用固定20条观测的循环块（可用参数调整），置信区间仍是近似；二项检验未校正时间依赖。",
+    "原始收益包含上涨日对应的负损失；负VaR/ES不截零，不代表产品没有未来下跌风险。",
+    "GPD外推可能超过单日100%损失的经济边界；此时报告异常标志而不截断或强行解释。",
+    "货币基金若仅提供每万份收益，按收益/10000处理，假设当日收益可再投资；不对每万份收益做涨跌幅。",
+    "单基金VaR不能直接相加或按权重求和得到组合VaR。"
+  ],
+  "source": {
+    "json_path": "/Users/weixxx/Desktop/选基开源项目/选基工具代码4.0/data_json/response.json",
+    "sha256": "27491dcf0b5f2ff15df440e4b71a136ffa4b67e23315f17bbd637898c669d047",
+    "product_code": null,
+    "product_name": "私募理财持有期日开1",
+    "value_field": "navAccumulated",
+    "return_basis": "相邻累计净值之比减一；累计净值未必等于分红再投资总回报",
+    "raw_rows": 6,
+    "valid_nav_rows": 6,
+    "identical_duplicate_rows_removed": 0,
+    "source_info": {}
+  },
+  "validation": {
+    "available": false,
+    "checks": {
+      "at_least_1000_daily_returns": false,
+      "at_least_three_calendar_years": false,
+      "daily_frequency_plausible": true,
+      "no_gap_over_14_calendar_days": true
+    },
+    "start": "2026-09-28",
+    "end": "2026-10-03",
+    "daily_return_count": 5,
+    "minimum_daily_returns": 1000,
+    "minimum_calendar_years": 3,
+    "maximum_gap_days": 1,
+    "median_gap_days": 1.0,
+    "note": "同时满足三年跨度和1000条收益（至少1001条净值）。不把周/月数据或长缺口跨期收益当作日收益；14日为可配置前需人工核查的保守缺口上限。"
+  },
+  "error": "数据未达到计算要求：at_least_1000_daily_returns, at_least_three_calendar_years",
+  "units": {
+    "frequency": "daily_observation",
+    "holding_period": "one_observed_trading_day",
+    "return_and_loss": "decimal; 0.03 = 3%; daily_loss = -daily_return",
+    "xi": "dimensionless",
+    "beta_and_threshold": "decimal_loss"
+  }
+}

@@ -1,0 +1,20 @@
+# 不上传的项目文件和目录
+/单基金预测回测/
+/单基金回测/results/
+/product字段
+/data.zip
+/上线流程工程与合规方案.md
+/接口开发说明.md
+/data/
+/客户找产品/
+
+# Python缓存、本地环境及密钥配置
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+.env
+.env.*
+!.env.example

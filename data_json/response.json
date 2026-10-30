@@ -1,0 +1,41 @@
+{
+    "data": {
+    "prdName": "私募理财持有期日开1",
+    "totalNum": 6,
+    "list": [
+    {
+    "date": "20260928",
+    "navAccumulated": "1.1756",
+    "navUnit": "1.1756"
+    },
+    {
+    "date": "20260929",
+    "navAccumulated": "1.0437",
+    "navUnit": "1.0437"
+    },
+    {
+    "date": "20260930",
+    "navAccumulated": "1.0431",
+    "navUnit": "1.0431"
+    },
+    {
+    "date": "20261001",
+    "navAccumulated": "1.1040",
+    "navUnit": "1.1040"
+    },
+    {
+    "date": "20261002",
+    "navAccumulated": "1.1396",
+    "navUnit": "1.1396"
+    },
+    {
+    "date": "20261003",
+    "navAccumulated": "0.9862",
+    "navUnit": "0.9862"
+    }
+    ]
+    },
+    "responseCode": "000000",
+    "responseMsg": "success",
+    "Thread": "7d23a2e4b389fbae7f2ac18fea82507e17"
+}

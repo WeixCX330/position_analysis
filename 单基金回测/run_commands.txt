@@ -1,0 +1,6 @@
+# Run these commands from the directory containing run.py:
+
+python run.py --prdCode 001313 --dateType 2
+python run.py --prdCode 150005 --dateType 9
+
+python run.py --json ../data_json/response.json --prdCode SMLC01 --dateType 0 9

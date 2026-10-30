@@ -1,0 +1,521 @@
+{
+  "status": "estimated_requires_diagnostic_review",
+  "created_at": "2026-10-30T09:53:21.499387+08:00",
+  "config": {
+    "threshold_quantile": 0.95,
+    "confidence_levels": [
+      0.99
+    ],
+    "bootstrap_repetitions": 0,
+    "block_size": 20,
+    "seed": 20261030
+  },
+  "versions": {
+    "python": "3.14.7",
+    "numpy": "2.5.2",
+    "pandas": "3.0.5",
+    "scipy": "1.18.1"
+  },
+  "limitations": [
+    "日度VaR/ES不是月度累计收益或最大回撤，也不是最大可能亏损。",
+    "全样本拟合使用所有已知历史，不能冒充各历史时点的预测；样本外检验仅使用训练期拟合参数。",
+    "不填补日期缺口，不调整分红或拆分；累计净值不一定是分红再投资总回报，应核对数据口径。",
+    "GPD是高阈值渐近近似；阈值、极值数量、结构变化及时间依赖会影响可靠性；拟合成功不是模型通过验证。",
+    "Bootstrap采用固定20条观测的循环块（可用参数调整），置信区间仍是近似；二项检验未校正时间依赖。",
+    "原始收益包含上涨日对应的负损失；负VaR/ES不截零，不代表产品没有未来下跌风险。",
+    "GPD外推可能超过单日100%损失的经济边界；此时报告异常标志而不截断或强行解释。",
+    "货币基金若仅提供每万份收益，按收益/10000处理，假设当日收益可再投资；不对每万份收益做涨跌幅。",
+    "单基金VaR不能直接相加或按权重求和得到组合VaR。"
+  ],
+  "source": {
+    "json_path": "/Users/weixxx/Desktop/选基开源项目/选基工具代码4.0/data_json/fund_nav_015723.json",
+    "sha256": "f685b701f78b3c37107ee34284b38d6f020e96f88edc2183ba65c3e4bc1ba1c6",
+    "product_code": "015723",
+    "product_name": "长城久悦债券C",
+    "value_field": "navAccumulated",
+    "return_basis": "相邻累计净值之比减一；累计净值未必等于分红再投资总回报",
+    "raw_rows": 1057,
+    "valid_nav_rows": 1057,
+    "identical_duplicate_rows_removed": 0,
+    "source_info": {
+      "mock": true,
+      "prdCode": "015723",
+      "sourceFile": "/Users/weixxx/Desktop/选基开源项目/选基工具代码4.0/data/cache/fund_nav_015723.csv",
+      "originalRows": 1057,
+      "exportedRows": 1057,
+      "excludedRows": 0,
+      "note": "累计净值及单位净值从原CSV直接转换，回测仅读取累计净值。"
+    }
+  },
+  "validation": {
+    "available": true,
+    "checks": {
+      "at_least_1000_daily_returns": true,
+      "at_least_three_calendar_years": true,
+      "daily_frequency_plausible": true,
+      "no_gap_over_14_calendar_days": true
+    },
+    "start": "2022-05-13",
+    "end": "2026-09-10",
+    "daily_return_count": 1056,
+    "minimum_daily_returns": 1000,
+    "minimum_calendar_years": 3,
+    "maximum_gap_days": 11,
+    "median_gap_days": 1.0,
+    "note": "同时满足三年跨度和1000条收益（至少1001条净值）。不把周/月数据或长缺口跨期收益当作日收益；14日为可配置前需人工核查的保守缺口上限。"
+  },
+  "full_sample_fit": {
+    "threshold_quantile": 0.95,
+    "threshold_loss": 0.01295749426723708,
+    "sample_count": 1056,
+    "exceedance_count": 53,
+    "exceedance_frequency": 0.050189393939393936,
+    "xi": 0.1313274809504979,
+    "beta": 0.005005772502710603,
+    "location": 0.0,
+    "method": "GPD MLE; floc=0",
+    "loss_upper_endpoint": null,
+    "warnings": []
+  },
+  "daily_risk": [
+    {
+      "confidence_level": 0.99,
+      "horizon": "one_observed_trading_day",
+      "var_loss": 0.021952077621279042,
+      "es_loss": 0.029074449218306205,
+      "es_status": "finite",
+      "expected_exceedance_probability": 0.010000000000000009,
+      "exceeds_100_percent_loss": false
+    }
+  ],
+  "tail_probabilities": [
+    {
+      "daily_loss_level": 0.03,
+      "probability": 0.0030092350387970015
+    },
+    {
+      "daily_loss_level": 0.05,
+      "probability": 0.00028532071347091704
+    },
+    {
+      "daily_loss_level": 0.1,
+      "probability": 5.8729705841778925e-06
+    }
+  ],
+  "diagnostics": {
+    "mean_excess": [
+      {
+        "q": 0.8,
+        "threshold_loss": 0.005618786918311525,
+        "count": 211,
+        "mean_excess": 0.0056017552802846765
+      },
+      {
+        "q": 0.8072916666666667,
+        "threshold_loss": 0.005929841629778151,
+        "count": 204,
+        "mean_excess": 0.00547758093814846
+      },
+      {
+        "q": 0.8145833333333333,
+        "threshold_loss": 0.006028604330568766,
+        "count": 196,
+        "mean_excess": 0.005600600211490871
+      },
+      {
+        "q": 0.821875,
+        "threshold_loss": 0.006437247897912278,
+        "count": 188,
+        "mean_excess": 0.005422121750090463
+      },
+      {
+        "q": 0.8291666666666667,
+        "threshold_loss": 0.006741481374509885,
+        "count": 181,
+        "mean_excess": 0.005321764153652311
+      },
+      {
+        "q": 0.8364583333333334,
+        "threshold_loss": 0.006924619814944509,
+        "count": 173,
+        "mean_excess": 0.00538083767976597
+      },
+      {
+        "q": 0.84375,
+        "threshold_loss": 0.0072021247279684085,
+        "count": 165,
+        "mean_excess": 0.005358442309120186
+      },
+      {
+        "q": 0.8510416666666667,
+        "threshold_loss": 0.007371435744009039,
+        "count": 158,
+        "mean_excess": 0.005422448804051555
+      },
+      {
+        "q": 0.8583333333333334,
+        "threshold_loss": 0.0076967978268047115,
+        "count": 150,
+        "mean_excess": 0.005380254737103124
+      },
+      {
+        "q": 0.865625,
+        "threshold_loss": 0.008062970730273579,
+        "count": 142,
+        "mean_excess": 0.00530607007946937
+      },
+      {
+        "q": 0.8729166666666667,
+        "threshold_loss": 0.008317453200080104,
+        "count": 135,
+        "mean_excess": 0.005320669948619277
+      },
+      {
+        "q": 0.8802083333333334,
+        "threshold_loss": 0.008614231836762708,
+        "count": 127,
+        "mean_excess": 0.005351662344974848
+      },
+      {
+        "q": 0.8875,
+        "threshold_loss": 0.008924142579570277,
+        "count": 119,
+        "mean_excess": 0.005390028569611893
+      },
+      {
+        "q": 0.8947916666666667,
+        "threshold_loss": 0.009302774038745468,
+        "count": 111,
+        "mean_excess": 0.00538504678088201
+      },
+      {
+        "q": 0.9020833333333333,
+        "threshold_loss": 0.009682362660538447,
+        "count": 104,
+        "mean_excess": 0.0053576731857174955
+      },
+      {
+        "q": 0.909375,
+        "threshold_loss": 0.010044755417971108,
+        "count": 96,
+        "mean_excess": 0.005423314391265251
+      },
+      {
+        "q": 0.9166666666666666,
+        "threshold_loss": 0.010300552800575128,
+        "count": 88,
+        "mean_excess": 0.005644596505471481
+      },
+      {
+        "q": 0.9239583333333333,
+        "threshold_loss": 0.010877202406859398,
+        "count": 81,
+        "mean_excess": 0.005530462706568945
+      },
+      {
+        "q": 0.93125,
+        "threshold_loss": 0.011544476698981239,
+        "count": 73,
+        "mean_excess": 0.005432361820594713
+      },
+      {
+        "q": 0.9385416666666666,
+        "threshold_loss": 0.01226253353617866,
+        "count": 65,
+        "mean_excess": 0.005334277558297779
+      },
+      {
+        "q": 0.9458333333333333,
+        "threshold_loss": 0.012720665668834527,
+        "count": 58,
+        "mean_excess": 0.005486738508498907
+      },
+      {
+        "q": 0.953125,
+        "threshold_loss": 0.013213662943347469,
+        "count": 50,
+        "mean_excess": 0.005834735031985629
+      },
+      {
+        "q": 0.9604166666666667,
+        "threshold_loss": 0.013866212294705301,
+        "count": 42,
+        "mean_excess": 0.006225568206827451
+      },
+      {
+        "q": 0.9677083333333333,
+        "threshold_loss": 0.015215650221668374,
+        "count": 35,
+        "mean_excess": 0.005988578280856991
+      },
+      {
+        "q": 0.975,
+        "threshold_loss": 0.01665126761204061,
+        "count": 27,
+        "mean_excess": 0.006146434867051358
+      }
+    ],
+    "threshold_stability": [
+      {
+        "threshold_quantile": 0.9,
+        "threshold_loss": 0.009478226056653716,
+        "sample_count": 1056,
+        "exceedance_count": 106,
+        "exceedance_frequency": 0.10037878787878787,
+        "xi": 0.08460138713500087,
+        "beta": 0.004995174279088261,
+        "location": 0.0,
+        "method": "GPD MLE; floc=0",
+        "loss_upper_endpoint": null,
+        "warnings": [],
+        "diagnostic_only": true
+      },
+      {
+        "threshold_quantile": 0.925,
+        "threshold_loss": 0.010924138507447514,
+        "sample_count": 1056,
+        "exceedance_count": 80,
+        "exceedance_frequency": 0.07575757575757576,
+        "xi": 0.09639823292300054,
+        "beta": 0.005015472450305776,
+        "location": 0.0,
+        "method": "GPD MLE; floc=0",
+        "loss_upper_endpoint": null,
+        "warnings": [],
+        "diagnostic_only": true
+      },
+      {
+        "threshold_quantile": 0.95,
+        "threshold_loss": 0.01295749426723708,
+        "sample_count": 1056,
+        "exceedance_count": 53,
+        "exceedance_frequency": 0.050189393939393936,
+        "xi": 0.1313274809504979,
+        "beta": 0.005005772502710603,
+        "location": 0.0,
+        "method": "GPD MLE; floc=0",
+        "loss_upper_endpoint": null,
+        "warnings": [],
+        "diagnostic_only": true
+      },
+      {
+        "threshold_quantile": 0.965,
+        "threshold_loss": 0.014985184675448182,
+        "sample_count": 1056,
+        "exceedance_count": 37,
+        "exceedance_frequency": 0.035037878787878785,
+        "xi": 0.15032453487080238,
+        "beta": 0.005012192262648057,
+        "location": 0.0,
+        "method": "GPD MLE; floc=0",
+        "loss_upper_endpoint": null,
+        "warnings": [
+          "超阈值样本不足50个，结果仅供探索；置信区间可能很宽。"
+        ],
+        "diagnostic_only": true
+      },
+      {
+        "threshold_quantile": 0.975,
+        "threshold_loss": 0.01665126761204061,
+        "sample_count": 1056,
+        "exceedance_count": 27,
+        "exceedance_frequency": 0.02556818181818182,
+        "xi": 0.14532430798041635,
+        "beta": 0.005262936956707158,
+        "location": 0.0,
+        "method": "GPD MLE; floc=0",
+        "loss_upper_endpoint": null,
+        "warnings": [
+          "超阈值样本不足50个，结果仅供探索；置信区间可能很宽。"
+        ],
+        "diagnostic_only": true
+      }
+    ],
+    "qq": {
+      "theoretical_excess": [
+        4.7477980476524426e-05,
+        0.00014398753516238485,
+        0.00024264083692461665,
+        0.000343529394617154,
+        0.0004467505734906677,
+        0.0005524081000174523,
+        0.000660612621919338,
+        0.0007714823307688353,
+        0.0008851436557037269,
+        0.0010017320381819478,
+        0.00112139279935291,
+        0.001244282113590673,
+        0.0013705681040949256,
+        0.001500432079307126,
+        0.0016340699323242162,
+        0.00177169372966396,
+        0.001913533520826465,
+        0.0020598394063393428,
+        0.0022108839096706707,
+        0.002366964707935884,
+        0.0025284077882237995,
+        0.0026955711112976455,
+        0.002868848883284703,
+        0.003048676559951668,
+        0.0032355367388911776,
+        0.003429966134624389,
+        0.00363256388329268,
+        0.0038440014914932134,
+        0.004065034833852173,
+        0.004296518724588294,
+        0.004539424751803596,
+        0.004794863287399095,
+        0.005064110896853933,
+        0.005348644811622175,
+        0.005650186754026751,
+        0.005970759316473419,
+        0.006312759447463228,
+        0.00667905563823402,
+        0.0070731185593101665,
+        0.007499199897993063,
+        0.007962582303668097,
+        0.008469937080296135,
+        0.009029850252562793,
+        0.009653621349563067,
+        0.010356522991484393,
+        0.01115987955307993,
+        0.012094694768406255,
+        0.013208445002310583,
+        0.014579027171866005,
+        0.016347242410026566,
+        0.018807863319079073,
+        0.022757680403698285,
+        0.03220570308829254
+      ],
+      "observed_excess": [
+        6.78440862787455e-05,
+        0.0002441222572353019,
+        0.0002457687047586199,
+        0.00026478579523042667,
+        0.0004154626421239427,
+        0.0004756106732604626,
+        0.0005617884992349942,
+        0.0007214114203078492,
+        0.0007232374213340109,
+        0.0008392687998895476,
+        0.000903598313001519,
+        0.0009249675559929726,
+        0.0011599328083052307,
+        0.0013066945825871978,
+        0.0013504943597463792,
+        0.002027124170790151,
+        0.002034674003069503,
+        0.0022004361248368354,
+        0.0022623478973627376,
+        0.002376492569340305,
+        0.0025429089224413004,
+        0.0026517314841025263,
+        0.002839581017110182,
+        0.0033637492560789073,
+        0.003427628621184564,
+        0.0034856367473874994,
+        0.003818655303253149,
+        0.004086930030133662,
+        0.004169937548829161,
+        0.004446889058934145,
+        0.004633845380936197,
+        0.00467340177916814,
+        0.004922550998700148,
+        0.005582691134616902,
+        0.006471494148342638,
+        0.006535683120677038,
+        0.006697145631681944,
+        0.006874496726094692,
+        0.0068829350203430395,
+        0.007835179505469803,
+        0.00808993656280238,
+        0.008123080373612368,
+        0.0082359897753162,
+        0.00910932779958501,
+        0.010381692153599908,
+        0.010977872691385782,
+        0.012172753970580874,
+        0.013987091396209739,
+        0.01407353587421295,
+        0.014100746947083909,
+        0.017102183033285978,
+        0.025941483081515615,
+        0.035758092673710606
+      ]
+    }
+  },
+  "out_of_sample": {
+    "train_count": 844,
+    "test_count": 212,
+    "train_start": "2022-05-16",
+    "train_end": "2025-10-30",
+    "test_start": "2025-10-31",
+    "test_end": "2026-09-10",
+    "method": "chronological_80_20_fixed_training_var",
+    "note": "二项检验假定超越事件独立；未拒绝不代表模型正确，聚集统计仅为描述性诊断；未进行正式ES回测。",
+    "available": true,
+    "training_fit": {
+      "threshold_quantile": 0.95,
+      "threshold_loss": 0.011726134561572142,
+      "sample_count": 844,
+      "exceedance_count": 43,
+      "exceedance_frequency": 0.0509478672985782,
+      "xi": 0.36834346494049763,
+      "beta": 0.003083535873691748,
+      "location": 0.0,
+      "method": "GPD MLE; floc=0",
+      "loss_upper_endpoint": null,
+      "warnings": [
+        "超阈值样本不足50个，结果仅供探索；置信区间可能很宽。"
+      ]
+    },
+    "risk_backtests": [
+      {
+        "confidence_level": 0.99,
+        "horizon": "one_observed_trading_day",
+        "var_loss": 0.018604473534769354,
+        "es_loss": 0.02749716564249106,
+        "es_status": "finite",
+        "expected_exceedance_probability": 0.010000000000000009,
+        "exceeds_100_percent_loss": false,
+        "breach_count": 11,
+        "breach_rate": 0.05188679245283019,
+        "expected_breach_count": 2.120000000000002,
+        "binomial_two_sided_p_value": 1.1905718799127431e-05,
+        "reject_at_5_percent": true,
+        "adjacent_breach_pairs": 0,
+        "longest_breach_run": 1,
+        "breach_dates": [
+          "2026-02-02",
+          "2026-03-03",
+          "2026-03-23",
+          "2026-03-31",
+          "2026-05-21",
+          "2026-05-29",
+          "2026-06-08",
+          "2026-07-13",
+          "2026-07-17",
+          "2026-07-28",
+          "2026-08-19"
+        ]
+      }
+    ]
+  },
+  "bootstrap": {
+    "method": "circular_block_bootstrap_reestimate_threshold_and_gpd",
+    "seed": 20261030,
+    "repetitions": 0,
+    "block_size": 20,
+    "confidence_level": 0.95,
+    "note": "近似95%百分位区间，不保证覆盖率；块长固定，未消除非平稳性；失败次数和无穷ES不隐去。",
+    "available": false,
+    "reason": "用户关闭Bootstrap"
+  },
+  "units": {
+    "frequency": "daily_observation",
+    "holding_period": "one_observed_trading_day",
+    "return_and_loss": "decimal; 0.03 = 3%; daily_loss = -daily_return",
+    "xi": "dimensionless",
+    "beta_and_threshold": "decimal_loss"
+  }
+}
