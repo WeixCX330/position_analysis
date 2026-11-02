@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from date_ranges.ranges import DATE_TYPES, resolve_period
 from models.data import load_nav
 from models.backtest import fit_model, simulate, evaluate_period
-from models.metrics import path_metrics, summarize
+from models.metrics import path_metrics, summarize, percentile_rank, build_backtest_output
 from analysis.analysis import call_llm
 
 
@@ -99,6 +99,79 @@ def test_positive_returns_keep_negative_var():
     assert summary["var_loss"] < 0 and summary["cvar_loss"] < 0
 
 
+def test_empirical_rank_handles_ties_invalid_actual_and_nonfinite_paths():
+    assert percentile_rank([.1, .2, .2, .3, np.nan, np.inf], .2) == .75
+    assert percentile_rank([0, 0, 0], 0) == 1.0
+    assert percentile_rank([.1], None) is None
+    assert percentile_rank([.1], np.nan) is None
+    assert percentile_rank([np.nan, np.inf], .1) is None
+
+
+@pytest.mark.parametrize("confidence", [.95, .99])
+def test_compact_output_matches_full_path_metrics_and_fixed_95_percent_risk(confidence):
+    # 使用完整路径重算并核对；禁止用前端10条样例或几个收益分位推算尾部平均损失。
+    shocks = np.random.default_rng(31).normal(.0002, .02, (1000, 5))
+    paths = np.c_[np.ones(1000), np.exp(np.cumsum(shocks, axis=1))]
+    metrics = path_metrics(paths, 5 / 365.2425, risk_free_rate=.02)
+    actual_values = path_metrics(paths[:1], 5 / 365.2425, risk_free_rate=.02)
+    actual = {key: values[0] for key, values in actual_values.items()}
+    summary = summarize(metrics, actual, confidence)
+    compact = build_backtest_output({"product_code": "001313", "periods": [
+        {"date_type": "4", "available": True, "simulation": summary}]})
+    assert compact["product"] == {"prd_code": "001313"}
+    period = compact["backtest"]["periods"][0]
+    # 与用户确认的接口示例核对，防止增加、漏掉或改名业务字段。
+    contract = json.loads((Path(__file__).parent / "docs/backtest_output_example.json").read_text())
+    assert set(compact) == set(contract)
+    assert set(period) == set(contract["backtest"]["periods"][0])
+    assert period["period"] == "1y"
+    for field, metric in {
+        "simulated_total_return_percentiles": "total_return",
+        "simulated_maximum_drawdown_percentiles": "maximum_drawdown",
+        "simulated_annualized_return_percentiles": "annualized_return",
+        "simulated_sharpe_ratio": "sharpe_ratio",
+    }.items():
+        assert set(period[field]) == {"p05", "p25", "p50", "p75", "p95"}
+        np.testing.assert_allclose(list(period[field].values()),
+                                   np.quantile(metrics[metric], [.05, .25, .5, .75, .95]))
+    losses = -metrics["total_return"]
+    expected_var = np.quantile(losses, .95)
+    assert period["simulated_var_95_loss"] == pytest.approx(expected_var)
+    assert period["simulated_cvar_95_loss"] == pytest.approx(losses[losses >= expected_var].mean())
+    assert summary["var_loss"] == pytest.approx(np.quantile(losses, confidence))
+    if confidence == .99:
+        assert period["simulated_var_95_loss"] != pytest.approx(summary["var_loss"])
+    for metric, field in {
+        "total_return": "actual_total_return_percentile_rank",
+        "maximum_drawdown": "actual_maximum_drawdown_percentile_rank",
+        "sharpe_ratio": "actual_sharpe_ratio_percentile_rank",
+    }.items():
+        assert period[field] == np.mean(metrics[metric] <= actual[metric])
+    assert period["simulated_loss_frequency"] == np.mean(metrics["total_return"] < 0)
+    json.dumps(compact, allow_nan=False)
+
+
+def test_compact_output_distinguishes_one_day_undefined_sharpe_from_unavailable_period():
+    metrics = path_metrics(np.array([[1, 1.01], [1, .99]]), 1 / 365.2425)
+    actual = {key: float(values[0]) for key, values in metrics.items()}
+    summary = summarize(metrics, actual)
+    compact = build_backtest_output({"product_code": "SMLC01", "periods": [
+        {"date_type": "0", "available": True, "simulation": summary},
+        {"date_type": "14", "available": False},
+    ]})
+    day, missing = compact["backtest"]["periods"]
+    assert day["period"] == "1d" and missing["period"] == "10y"
+    assert day["simulated_sharpe_ratio"] == dict.fromkeys(["p05", "p25", "p50", "p75", "p95"])
+    assert day["actual_sharpe_ratio_percentile_rank"] is None
+    assert day["simulated_maximum_drawdown_percentiles"]["p50"] == pytest.approx(.005)
+    assert day["actual_maximum_drawdown_percentile_rank"] == .5
+    for key, value in missing.items():
+        if key == "period":
+            continue
+        assert all(v is None for v in value.values()) if isinstance(value, dict) else value is None
+    json.dumps(compact, allow_nan=False)
+
+
 def test_tiny_positive_terminal_nav_keeps_correct_annualized_return():
     metrics = path_metrics(np.array([[1.0, 1e-30]]), 10)
     assert metrics["total_return"][0] == -1.0  # 浮点精度下累计收益舍入为-1。
@@ -113,6 +186,17 @@ def test_gbm_matches_known_terminal_distribution_and_seed():
     for q in (.05, .5, .95):
         theoretical = np.expm1(.0001 * 252 + .01 * np.sqrt(252) * NormalDist().inv_cdf(q))
         assert np.quantile(first["total_return"], q) == pytest.approx(theoretical, abs=.015)
+
+
+def test_negative_var_and_positive_cvar_are_valid_loss_statistics():
+    # 4%路径亏损；95%损失分位仍为盈利，最差5%的平均损失却为正。
+    returns = np.r_[np.linspace(.01, .10, 960), np.linspace(-.30, -.01, 40)]
+    result = summarize({"total_return": returns}, {"total_return": .02}, .95)
+    assert result["var_loss"] < 0 < result["cvar_loss"]
+    assert result["loss_frequency"] == pytest.approx(.04)
+    losses = -returns
+    assert result["var_loss"] == pytest.approx(np.quantile(losses, .95))
+    assert result["cvar_loss"] == pytest.approx(losses[losses >= result["var_loss"]].mean())
 
 
 def test_since_uses_first_twenty_navs_and_starts_at_twentieth_nav():

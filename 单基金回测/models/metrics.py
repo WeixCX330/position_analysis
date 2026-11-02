@@ -46,13 +46,67 @@ def distribution(values):
     }
 
 
+def percentile_rank(values, actual_value):
+    """不超过真实值的有效模拟值占比；包含并列值，不把不可计算当成零。"""
+    if actual_value is None or not np.isfinite(actual_value):
+        return None
+    values = np.asarray(values, dtype=float)
+    finite = values[np.isfinite(values)]
+    return float(np.mean(finite <= actual_value)) if len(finite) else None
+
+
 def summarize(metrics, actual, confidence=0.95):
     losses = -metrics["total_return"]
     var = float(np.quantile(losses, confidence))
     tail = losses[losses >= var]
+    # 精简接口的字段名固定为95，不能随主报告的--confidence改变含义。
+    var_95 = var if confidence == 0.95 else float(np.quantile(losses, 0.95))
     return {
         "metric_distributions": {key: distribution(value) for key, value in metrics.items()},
         "loss_frequency": float(np.mean(metrics["total_return"] < 0)),
         "var_confidence": confidence, "var_loss": var, "cvar_loss": float(tail.mean()),
-        "actual_percentile_rank": float(np.mean(metrics["total_return"] <= actual["total_return"])),
+        "var_95_loss": var_95, "cvar_95_loss": float(losses[losses >= var_95].mean()),
+        "actual_total_return_percentile_rank": percentile_rank(metrics["total_return"], actual["total_return"]),
+        "actual_maximum_drawdown_percentile_rank": percentile_rank(
+            metrics.get("maximum_drawdown", []), actual.get("maximum_drawdown")),
+        "actual_sharpe_ratio_percentile_rank": percentile_rank(
+            metrics.get("sharpe_ratio", []), actual.get("sharpe_ratio")),
     }
+
+
+def build_backtest_output(result):
+    """从同一次计算的完整结果导出约定的12项字段，不重跑模拟或用图表样例估算。"""
+    period_codes = {
+        "0": "1d", "1": "1w", "2": "1m", "3": "3m", "4": "1y",
+        "5": "6m", "6": "3y", "7": "2y", "8": "4y", "9": "inception",
+        "10": "5y", "11": "ytd", "12": "mtd", "13": "6y", "14": "10y",
+        "15": "2m", "16": "4m", "custom": "custom",
+    }
+    distribution_fields = {
+        "simulated_total_return_percentiles": "total_return",
+        "simulated_maximum_drawdown_percentiles": "maximum_drawdown",
+        "simulated_annualized_return_percentiles": "annualized_return",
+        "simulated_sharpe_ratio": "sharpe_ratio",
+    }
+    scalar_fields = {
+        "simulated_var_95_loss": "var_95_loss",
+        "simulated_cvar_95_loss": "cvar_95_loss",
+        "simulated_loss_frequency": "loss_frequency",
+        "actual_total_return_percentile_rank": "actual_total_return_percentile_rank",
+        "actual_maximum_drawdown_percentile_rank": "actual_maximum_drawdown_percentile_rank",
+        "actual_sharpe_ratio_percentile_rank": "actual_sharpe_ratio_percentile_rank",
+    }
+    periods = []
+    for period in result["periods"]:
+        # 保留所选档位。模拟不可用时所有模拟结果均为null，原因查看完整result.json。
+        simulation = period.get("simulation", {}) if period["available"] else {}
+        distributions = simulation.get("metric_distributions", {})
+        item = {"period": period_codes[period["date_type"]]}
+        for field, metric in distribution_fields.items():
+            dist = distributions.get(metric, {})
+            quantiles = dist.get("percentiles", {}) if dist.get("available") else {}
+            item[field] = {f"p{int(q * 100):02d}": quantiles.get(f"p{int(q * 100):02d}")
+                           for q in QUANTILES}
+        item.update({field: simulation.get(source) for field, source in scalar_fields.items()})
+        periods.append(item)
+    return {"product": {"prd_code": result["product_code"]}, "backtest": {"periods": periods}}

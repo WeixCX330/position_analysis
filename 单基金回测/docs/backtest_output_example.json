@@ -1,0 +1,46 @@
+{
+  "product": {
+    "prd_code": "150005"
+  },
+  "backtest": {
+    "periods": [
+      {
+        "period": "1y",
+        "simulated_total_return_percentiles": {
+          "p05": 0.015649791323946893,
+          "p25": null,
+          "p50": 0.017224600155636538,
+          "p75": null,
+          "p95": 0.018823245777218445
+        },
+        "simulated_maximum_drawdown_percentiles": {
+          "p05": null,
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p95": null
+        },
+        "simulated_var_95_loss": null,
+        "simulated_cvar_95_loss": null,
+        "simulated_loss_frequency": 0.0,
+        "actual_total_return_percentile_rank": 0.0,
+        "simulated_annualized_return_percentiles": {
+          "p05": 0.015660269780042833,
+          "p25": null,
+          "p50": 0.01723614195820311,
+          "p75": null,
+          "p95": 0.0188358686792496
+        },
+        "simulated_sharpe_ratio": {
+          "p05": null,
+          "p25": null,
+          "p50": null,
+          "p75": null,
+          "p95": null
+        },
+        "actual_maximum_drawdown_percentile_rank": null,
+        "actual_sharpe_ratio_percentile_rank": null
+      }
+    ]
+  }
+}

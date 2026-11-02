@@ -13,6 +13,7 @@ import numpy as np
 from date_ranges.ranges import DATE_TYPES, resolve_period
 from models.data import load_nav
 from models.backtest import evaluate_period
+from models.metrics import build_backtest_output
 from analysis.analysis import analyze
 from frontend.page import write_page
 
@@ -97,8 +98,12 @@ def main(argv=None):
         })
         result["analysis"] = analyze(result, output, args.llm)
         (output / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+        compact_path = output / "backtest_output.json"
+        compact_path.write_text(json.dumps(build_backtest_output(result), ensure_ascii=False,
+                                          indent=2, allow_nan=False) + "\n", encoding="utf-8")
         page = write_page(result, output)
         print(json.dumps({"result_dir": str(output), "report": str(page),
+                          "backtest_output": str(compact_path),
                           "simulation_available": sum(p["available"] for p in periods),
                           "selected_periods": len(periods), "llm_used": result["analysis"]["llm_status"]["used"]},
                          ensure_ascii=False, indent=2))

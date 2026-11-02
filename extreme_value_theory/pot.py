@@ -8,6 +8,7 @@
 仅此文件包含全部实现；结果默认存入本文件旁的 results/<时间_产品编号>/。
 至少 1001 条有效净值（1000 条收益），且日期跨度至少三个日历年。
 不补交易日、不前向填充；相邻有效观测收益视为一个交易日收益，长缺口拒绝计算。
+诊断图同时输出300 DPI PNG和矢量SVG；样式内置，不依赖外部skill或字体包。
 """
 
 import argparse
@@ -275,54 +276,138 @@ def bootstrap_intervals(losses, q, levels, repetitions, block_size, seed):
 
 
 def draw_diagnostics(result, frame, output):
+    """只读取已有估计结果，绘制四联诊断图；不重新拟合或调整风险值。"""
+    import os
+    import tempfile
+    os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "pot-matplotlib"))
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.ticker import PercentFormatter
+    import matplotlib.dates as mdates
+    from matplotlib.ticker import FuncFormatter, MaxNLocator, PercentFormatter
 
+    output = Path(output)
     diag, oos = result["diagnostics"], result["out_of_sample"]
-    with plt.rc_context({"font.size": 10, "axes.spines.top": False, "axes.spines.right": False}):
-        fig, axes = plt.subplots(2, 2, figsize=(12, 8), layout="constrained")
+    fit = result["full_sample_fit"]
+    blue, orange, navy, muted = "#0072B2", "#B34700", "#175777", "#526474"
+    # 货币基金损失可能仅为万分之一量级，固定两位百分数会误显示成0.00%。
+    loss_formatter = FuncFormatter(lambda value, _: f"{value * 100:.3g}%")
+    styles = {"font.family": "DejaVu Sans", "font.size": 10,
+              "text.color": "#172b3a", "axes.labelcolor": "#344657",
+              "axes.titlesize": 12, "axes.titleweight": "bold", "axes.titlelocation": "left",
+              "axes.titlepad": 26,
+              "axes.spines.top": False, "axes.spines.right": False,
+              "axes.edgecolor": "#87939f", "axes.linewidth": .7,
+              "xtick.color": "#344657", "ytick.color": "#344657",
+              "legend.frameon": False, "legend.fontsize": 8,
+              "svg.fonttype": "path", "savefig.facecolor": "white"}
+    with plt.rc_context(styles):
+        fig, axes = plt.subplots(2, 2, figsize=(13.6, 9.2), layout="constrained")
         ax = axes[0, 0]
         rows = diag["mean_excess"]
         ax.plot([r["threshold_loss"] for r in rows],
                 [r["mean_excess"] if r["mean_excess"] is not None else np.nan for r in rows],
-                "o-", color="#0072B2", markersize=3)
-        ax.set(title="A. Mean excess (full sample)", xlabel="Daily loss threshold u", ylabel="Mean excess loss")
-        ax.xaxis.set_major_formatter(PercentFormatter(1))
-        ax.yaxis.set_major_formatter(PercentFormatter(1))
+                "o-", color=blue, markersize=3.5, linewidth=1.3, label="Empirical mean excess")
+        ax.axvline(fit["threshold_loss"], color=orange, ls="--", lw=1.3,
+                   label=f"Selected threshold q={fit['threshold_quantile']:.1%}")
+        ax.set(title="A. Mean excess", xlabel="Daily loss threshold u (%)", ylabel="Mean excess loss (%)")
+        ax.xaxis.set_major_formatter(loss_formatter)
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value * 100:.3g}%"))
+        ax.legend(loc="best")
+        ax.text(0, 1.025, f"Full sample n={fit['sample_count']:,}; 25 candidate quantiles",
+                color=muted, fontsize=8.5, transform=ax.transAxes)
+
         ax = axes[0, 1]
         rows = diag["threshold_stability"]
         ax.plot([r["threshold_quantile"] for r in rows],
-                [r["xi"] if r["xi"] is not None else np.nan for r in rows], "s-", color="#0072B2")
-        ax.axhline(0, ls="--", color="#555555", lw=1)
-        ax.set(title="B. Threshold sensitivity (point estimates)", xlabel="Threshold quantile", ylabel="GPD shape xi")
+                [r["xi"] if r["xi"] is not None else np.nan for r in rows],
+                "s-", color=blue, markersize=4, linewidth=1.3, label="Candidate fits")
+        ax.scatter([fit["threshold_quantile"]], [fit["xi"]], marker="D", s=42,
+                   color=orange, edgecolor="white", linewidth=.6, zorder=4, label="Selected fit")
+        ax.axhline(0, ls="--", color=muted, lw=.9, label="xi = 0 (exponential tail)")
+        for row in rows:
+            if row["xi"] is not None:
+                ax.annotate(f"k={row['exceedance_count']}", (row["threshold_quantile"], row["xi"]),
+                            xytext=(0, 8), textcoords="offset points", ha="center", fontsize=8, color=muted)
+        ax.set(title="B. Threshold sensitivity", xlabel="Loss threshold quantile (%)", ylabel="GPD shape xi (unitless)")
+        ax.xaxis.set_major_formatter(PercentFormatter(1, decimals=1))
+        ax.set_xticks(sorted({r["threshold_quantile"] for r in rows} | {fit["threshold_quantile"]}))
+        ax.margins(y=.28)
+        ax.legend(loc="best")
+        ax.text(0, 1.025, "Point estimates; k = exceedances; no confidence band",
+                color=muted, fontsize=8.5, transform=ax.transAxes)
+
         ax = axes[1, 0]
         theory, observed = diag["qq"]["theoretical_excess"], diag["qq"]["observed_excess"]
-        ax.scatter(theory, observed, s=14, color="#0072B2", label="Observed excesses")
-        upper = max(max(theory), max(observed))
-        ax.plot([0, upper], [0, upper], "--", color="#A63D00", label="45-degree reference")
-        ax.set(title="C. GPD Q-Q (full sample)", xlabel="Theoretical excess loss", ylabel="Observed excess loss")
-        ax.xaxis.set_major_formatter(PercentFormatter(1))
-        ax.yaxis.set_major_formatter(PercentFormatter(1))
-        ax.legend(fontsize=8)
+        ax.scatter(theory, observed, s=20, color=blue, edgecolor="white", linewidth=.4,
+                   label="Observed excesses", zorder=3)
+        upper = max(max(theory), max(observed)) * 1.05
+        ax.plot([0, upper], [0, upper], "--", color=orange, linewidth=1.4, label="y = x reference")
+        ax.set(title="C. GPD Q-Q", xlabel="Theoretical excess loss (%)", ylabel="Observed excess loss (%)",
+               xlim=(0, upper), ylim=(0, upper))
+        # 相同单位、相同范围和等比例坐标，y=x才在视觉上真正为45度。
+        ax.set_aspect("equal", adjustable="box")
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value * 100:.3g}%"))
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value * 100:.3g}%"))
+        ax.legend(loc="upper left")
+        ax.text(0, 1.025, f"Full-sample excesses k={fit['exceedance_count']}; identical axis scales",
+                color=muted, fontsize=8.5, transform=ax.transAxes)
+
         ax = axes[1, 1]
         if oos["available"]:
             test = frame.iloc[1:].iloc[-oos["test_count"]:]
             risk = oos["risk_backtests"][0]
-            ax.scatter(test.date, test.daily_loss, s=8, color="#0072B2", label="Observed daily loss")
-            ax.axhline(risk["var_loss"], color="#A63D00", ls="--", label=f"Training-only VaR {risk['confidence_level']:.1%}")
-            ax.legend(fontsize=8)
-            ax.tick_params(axis="x", labelrotation=20)
-            ax.yaxis.set_major_formatter(PercentFormatter(1))
+            breaches = test.daily_loss > risk["var_loss"]
+            ax.scatter(test.date, test.daily_loss, s=12, color=blue, alpha=.7,
+                       linewidths=0, label="Observed daily loss")
+            ax.scatter(test.loc[breaches, "date"], test.loc[breaches, "daily_loss"], s=28,
+                       color=orange, marker="^", edgecolor="white", linewidth=.4, zorder=4,
+                       label=f"VaR exceedances (n={int(breaches.sum())})")
+            ax.axhline(risk["var_loss"], color=navy, ls="--", lw=1.4,
+                       label=f"Training-only VaR {risk['confidence_level']:.1%} = {risk['var_loss'] * 100:.3g}%")
+            ax.axhline(0, color=muted, ls=":", lw=.7)
+            ax.legend(loc="best")
+            locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+            ax.xaxis.set_major_locator(locator)
+            ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value * 100:.3g}%"))
+            ax.text(0, 1.025, f"Holdout n={oos['test_count']:,}; frozen first-80% fit; no refitting",
+                    color=muted, fontsize=8.5, transform=ax.transAxes)
         else:
-            ax.text(0.5, 0.5, "Out-of-sample fit unavailable\nSee result.json for reason", ha="center", transform=ax.transAxes)
-        ax.set(title="D. Chronological holdout (last 20%)", xlabel="Observation date", ylabel="One-day loss")
+            ax.text(0.5, 0.5, "Out-of-sample fit unavailable\nSee result.json for reason",
+                    ha="center", va="center", color=muted, transform=ax.transAxes)
+            ax.set(xticks=[], yticks=[])
+        ax.set(title="D. Chronological holdout", xlabel="Observation date", ylabel="One-day loss (%)")
         for ax in axes.flat:
-            ax.grid(alpha=0.2)
-        fig.suptitle(f"POT diagnostics | n={result['full_sample_fit']['sample_count']} | losses in decimal units")
-        fig.savefig(output / "diagnostics.png", dpi=180, facecolor="white")
+            ax.set_axisbelow(True)
+            ax.grid(color="#e3e9ee", linewidth=.6)
+            if ax is not axes[1, 1] or oos["available"]:
+                ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+        code = result.get("source", {}).get("product_code") or "unspecified"
+        start, end = frame.date.iloc[0].strftime("%Y-%m-%d"), frame.date.iloc[-1].strftime("%Y-%m-%d")
+        fig.suptitle(f"Fund {code} | POT / GPD diagnostics | {start} to {end}\n"
+                     f"Daily loss = -return | n={fit['sample_count']:,} | selected q={fit['threshold_quantile']:.1%}",
+                     fontsize=13)
+        fig.savefig(output / "diagnostics.png", dpi=300, facecolor="white")
+        fig.savefig(output / "diagnostics.svg", facecolor="white")
         plt.close(fig)
+    metadata = {
+        "source_sha256": result.get("source", {}).get("sha256"), "product_code": code,
+        "start": start, "end": end, "full_sample_count": fit["sample_count"],
+        "exceedance_count": fit["exceedance_count"], "selected_threshold_quantile": fit["threshold_quantile"],
+        "holdout_plot_confidence": oos["risk_backtests"][0]["confidence_level"] if oos["available"] else None,
+        "palette": {"observations": blue, "highlight": orange, "training_var": navy},
+        "units": "Percent loss axes; xi is unitless; signs retained without clipping",
+        "transformations": "Existing result arrays only; candidate thresholds connected without smoothing; no re-fitting",
+        "uncertainty": "Threshold point estimates only; no confidence band; bootstrap intervals are in result.json",
+        "missing": "Missing candidate estimates retained as line gaps; unavailable holdout labelled explicitly",
+        "qq": "Same limits and equal aspect ratio; y=x is the 45-degree reference",
+        "holdout": "All holdout observations shown without connecting or smoothing; exceedances highlighted above the first requested confidence VaR",
+        "matplotlib": matplotlib.__version__, "png_dpi": 300, "size_inches": [13.6, 9.2],
+    }
+    (output / "diagnostics_meta.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def write_report(result, output):
@@ -358,7 +443,15 @@ def write_report(result, output):
                   "参数、VaR、ES 的95%循环块Bootstrap区间及失败次数详见 result.json。", "",
                   ("![POT诊断：均值超额、阈值敏感性、Q-Q及冻结训练VaR的样本外日损失](diagnostics.png)"
                    if (output / "diagnostics.png").exists() else "诊断图未生成，请查看错误原因。"), "",
-                  "图中数据及变换可从 result.json 和 daily_returns.csv 复核；阈值敏感性图为点估计，无置信带。", ""]
+                  "[下载矢量诊断图 SVG](diagnostics.svg) · [下载300 DPI PNG](diagnostics.png) · [绘图口径与来源](diagnostics_meta.json)", "",
+                  "图中数据及变换可从 result.json 和 daily_returns.csv 复核；阈值敏感性图为点估计，无置信带。",
+                  "A：均值超额随候选阈值变化，虚线为选定阈值；连线不代表平滑拟合。",
+                  "B：不同阈值的xi点估计，k为超阈值样本数，菱形为实际选定的拟合。",
+                  "C：等比例Q-Q图，横纵轴同范围，虚线为y=x；不删除或裁切尾部观测。",
+                  "D：最后20%日期的全部日损失；虚线为仅用前80%训练数据拟合的固定VaR，三角形为超越。",
+                  "若请求多个置信水平，D图展示参数列表中的第一个，其余结果见JSON和上方样本外检验。",
+                  "亏损为正、盈利为负，未对VaR或日损失取绝对值；纵轴按数据自动定范围，不强制从零开始。",
+                  "绘图样式内置于pot.py，无需额外skill或Python包。这里采用一般科研图表样式，不表示满足某个期刊投稿规范。", ""]
     lines += ["## 解释边界", ""] + [f"- {s}" for s in result["limitations"]]
     lines += ["", "## 方法来源", "", "实现依据：用户提供的《极值理论-POT方法.md》。",
               "[SciPy GPD](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genpareto.html)；",

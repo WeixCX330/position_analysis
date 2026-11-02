@@ -7,7 +7,12 @@
 /接口开发说明.md
 /data/
 /客户找产品/
-
+/extreme_value_theory/results
+/synthetic_data
+/extreme_value_theory/pot_explained.md
+/单基金回测/models/metrics_explained.md
+/单基金回测/backtest_holdings_analysis.md
+/单基金回测/holding_analysis_rules.md
 # Python缓存、本地环境及密钥配置
 __pycache__/
 *.py[cod]

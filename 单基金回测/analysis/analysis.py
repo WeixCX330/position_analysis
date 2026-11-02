@@ -18,39 +18,78 @@ def draw_charts(result, output_dir):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.ticker import FuncFormatter, MaxNLocator
+    from matplotlib.ticker import FuncFormatter, MaxNLocator, PercentFormatter
+    from matplotlib.lines import Line2D
 
     available = [p for p in result["periods"] if p["available"]]
     if not available:
         return None
     period = next((p for p in available if p["date_type"] == "4"), available[0])
-    fig, axes = plt.subplots(2, 3, figsize=(13, 7))
-    for ax, key in zip(axes.flat, METRICS):
-        dist = period["simulation"]["metric_distributions"][key]
-        ax.set_title(key.replace("_", " "))
-        if not dist["available"]:
-            ax.text(.5, .5, "Insufficient daily\nobservations", ha="center", fontsize=10, transform=ax.transAxes)
-            continue
-        edges, counts = dist["histogram"]["edges"], dist["histogram"]["counts"]
-        ax.stairs(counts, edges, fill=True, color="#5a80a0", alpha=.75)
-        for q in ("p05", "p50", "p95"):
-            ax.axvline(dist["percentiles"][q], color="#267a70", alpha=.8, lw=1)
-        actual = period["actual"][key]
-        if actual is not None:
-            ax.axvline(actual, color="#d05c37", lw=1.6, label="Actual")
-            ax.legend(fontsize=8)
-        ax.grid(axis="y", alpha=.2)
-        if key != "sharpe_ratio":
-            ax.xaxis.set_major_formatter(FuncFormatter(
-                lambda value, _: f"{value * 100:.1e}%" if abs(value) >= 1e4 else f"{value * 100:.0f}%"))
-            if max(abs(edges[0]), abs(edges[-1])) >= 1e4:
-                ax.xaxis.set_major_locator(MaxNLocator(nbins=3))
-    mode = "20 NAV warmup / Out-of-sample" if period["fit"]["calibration_mode"] == "initial_20_nav_out_of_sample" else "Out-of-sample"
-    fig.suptitle(f"Fund {result['product_code']} | {period['start']} - {period['end']} | Daily GBM | {mode}")
-    fig.tight_layout()
-    path = Path(output_dir) / "charts.png"
-    fig.savefig(path, dpi=140)
-    plt.close(fig)
+    titles = ("Cumulative return", "Compound annual return", "Maximum drawdown",
+              "Annual volatility", "Sharpe ratio", "Annual downside deviation")
+    styles = {"font.family": "DejaVu Sans", "font.size": 10, "axes.titlesize": 12,
+              "axes.titleweight": "bold", "axes.labelsize": 10,
+              "axes.spines.top": False, "axes.spines.right": False,
+              "axes.edgecolor": "#87939f", "axes.linewidth": .7,
+              "text.color": "#172b3a", "axes.labelcolor": "#344657",
+              "xtick.color": "#344657", "ytick.color": "#344657",
+              "svg.fonttype": "path", "savefig.facecolor": "white"}
+    with plt.rc_context(styles):
+        fig, axes = plt.subplots(2, 3, figsize=(14, 8.4), layout="constrained")
+        for i, (ax, key, title) in enumerate(zip(axes.flat, METRICS, titles)):
+            dist = period["simulation"]["metric_distributions"][key]
+            ax.set_title(f"{chr(65+i)}. {title}", loc="left", pad=12)
+            ax.set_xlabel("Ratio (unitless)" if key == "sharpe_ratio" else "Metric value (%)")
+            ax.set_ylabel("Paths per bin (%)")
+            if not dist["available"]:
+                ax.text(.5, .5, "Not estimable\nInsufficient observations / zero volatility",
+                        ha="center", va="center", fontsize=9, transform=ax.transAxes)
+                ax.set(xticks=[], yticks=[])
+                continue
+            edges, counts = dist["histogram"]["edges"], dist["histogram"]["counts"]
+            shares = [n / dist["sample_count"] for n in counts]
+            ax.stairs(shares, edges, fill=True, color="#0072B2", alpha=.28, linewidth=1.1)
+            ax.stairs(shares, edges, color="#0072B2", linewidth=1.1)
+            for q, ls, width in (("p05", "--", 1), ("p50", "-", 1.5), ("p95", "-.", 1)):
+                ax.axvline(dist["percentiles"][q], color="#175777", ls=ls, lw=width)
+            actual = period["actual"][key]
+            if actual is not None:
+                ax.axvline(actual, color="#B34700", lw=1.8)
+            ax.set_ylim(bottom=0)
+            ax.set_axisbelow(True)
+            ax.grid(axis="y", color="#e3e9ee", linewidth=.6)
+            ax.yaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+            if key != "sharpe_ratio":
+                ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value*100:.3g}%"))
+            def value_text(v):
+                return "N/A" if v is None else f"{v:.3g}" if key == "sharpe_ratio" else f"{v*100:.3g}%"
+            qs = dist["percentiles"]
+            ax.text(0, 1.015, f"n={dist['sample_count']:,} | P50 {value_text(qs['p50'])} | Actual {value_text(actual)}",
+                    fontsize=8, color="#526474", transform=ax.transAxes)
+        fig.legend(handles=[Line2D([], [], color="#B34700", lw=1.8, label="Observed history"),
+                            Line2D([], [], color="#175777", ls="--", label="P05"),
+                            Line2D([], [], color="#175777", lw=1.5, label="P50"),
+                            Line2D([], [], color="#175777", ls="-.", label="P95")],
+                   loc="outside lower center", ncols=4, frameon=False)
+        fig.suptitle(f"Fund {result['product_code']} | {period['start']} to {period['end']}\n"
+                     "Historical GBM comparison | 32 equal-width bins; simulation quantiles, not confidence intervals",
+                     fontsize=12)
+        path = Path(output_dir) / "charts.png"
+        fig.savefig(path, dpi=300, facecolor="white")
+        fig.savefig(Path(output_dir) / "charts.svg", facecolor="white")
+        plt.close(fig)
+    (Path(output_dir) / "charts_meta.json").write_text(json.dumps({
+        "product_code": result["product_code"], "date_type": period["date_type"],
+        "start": period["start"], "end": period["end"], "source_sha256": result["source"].get("sha256"),
+        "palette": {"simulation": "#0072B2", "actual": "#B34700", "quantiles": "#175777"},
+        "binning": "Original 32-bin counts divided by each metric's finite sample_count; no rebinning or smoothing",
+        "uncertainty": "Cross-path P05/P50/P95; not parameter confidence intervals",
+        "scope": "One selected period: prefer dateType=4, else first available; web figures follow dropdown",
+        "matplotlib": matplotlib.__version__, "png_dpi": 300, "size_inches": [14, 8.4],
+        "missing": "Non-estimable panels labelled explicitly; no zero substitution"
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
     return path.name
 
 
@@ -86,7 +125,7 @@ def deterministic_analysis(result):
         if not p["available"]:
             continue
         sim = p["simulation"]
-        rank = sim["actual_percentile_rank"]
+        rank = sim["actual_total_return_percentile_rank"]
         position = "低于模型5%分位" if rank < .05 else "高于模型95%分位" if rank > .95 else "位于模型中间90%范围内"
         if p["fit"]["calibration_mode"] == "initial_20_nav_out_of_sample":
             lines.append(f"- {p['label']}：数据始于{p['data_start']}，前20条净值产生19个日收益用于估参；"

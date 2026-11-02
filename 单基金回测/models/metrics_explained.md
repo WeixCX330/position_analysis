@@ -363,7 +363,7 @@ float(np.mean(metrics["total_return"] < 0))
 
 它是给定模型、参数和历史起点下的模拟频率，不是经过校准的客户实际亏损概率。
 
-## 19. 真实收益所在模拟百分位 actual_percentile_rank
+## 19. 真实收益所在模拟百分位 actual_total_return_percentile_rank
 
 ```python
 float(np.mean(metrics["total_return"] <= actual["total_return"]))
@@ -388,7 +388,7 @@ float(np.mean(metrics["total_return"] <= actual["total_return"]))
 | `var_confidence` | VaR/CVaR 使用的置信水平 |
 | `var_loss` | 区间终点损失分位数 |
 | `cvar_loss` | 损失不低于 VaR 的路径平均损失 |
-| `actual_percentile_rank` | 真实累计收益对应的模拟经验累计比例 |
+| `actual_total_return_percentile_rank` | 真实累计收益对应的模拟经验累计比例 |
 
 真实指标中的非有限值在 `evaluate_period()` 中转为 `None`，最终写 JSON 为 `null`；模拟指标在 `distribution()` 中过滤非有限值。
 
